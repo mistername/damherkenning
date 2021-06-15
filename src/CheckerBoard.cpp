@@ -8,16 +8,22 @@
 #include"Threshold.h"
 #include"DominantColor.h"
 #include"Constants.h"
+#include"EdgeOperator.h"
+#include"Canny.h"
 
-using namespace cv;
 using namespace std;
 
 
-const std::array<std::array<uchar, 3>, 3> guass_kernel = { { {1,2,1}, {2,4,2},{1,2,1} } };
+const std::array<std::array<uint8_t, 3>, 3> guass_kernel = { { {1,2,1}, {2,4,2},{1,2,1} } };
+const std::array<std::array<uint8_t, 3>, 3> sobol_kernel = { { 
+    {1,0,uint8_t(-1)}, 
+    {2,0,uint8_t(-2)},
+    {1,0,uint8_t(-1)} } };
+
+Blur guassian = Blur(guass_kernel);
 
 CheckerBoard::CheckerBoard(Image& image)
 {
-    Blur guassian = Blur(guass_kernel);
     auto blurred = guassian.ApplyFunction(image);
     //blurred = guassian.ApplyFunction(blurred);
 	_image = blurred;
@@ -27,18 +33,24 @@ bool CheckerBoard::CalculatePoints()
 {
     auto thresh = DominantColor(ConstantsValues::DominationMinimum.getValue(), ConstantsValues::DominationMultiplier.getValue());
     auto threshed = thresh.ApplyFunction(_image);
+    threshed = guassian.ApplyFunction(threshed);
     cv::imwrite("threshed.png", threshed.toOutput());
+    auto sobol = EdgeOperator(sobol_kernel);
+    auto simg = sobol.ApplyFunction(threshed);
+    auto cnny =  Canny();
+    auto cimg = cnny.ApplyFunction(simg);
+    
+    cv::imwrite("canny.png", cimg.toOutput());
     //cv::imshow("threshed", threshed.toOutput());
     //cv::waitKey(100);
     cv::Mat edges;
-    Canny(threshed.toOutput(), edges, 100, 200);
+    cv::Canny(threshed.toOutput(), edges, 100, 200);
     cv::imwrite("edges.png", edges);
 
-    vector<vector<Point> > contours;
-    vector<Vec4i> hierarchy;
-    cv::findContours(edges, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+    vector<vector<cv::Point> > contours;
+    vector<cv::Vec4i> hierarchy;
+    cv::findContours(edges, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-    std::cout << contours.size() << std::endl;
     if (contours.size() != 4)
     {
         return false;
@@ -203,22 +215,22 @@ std::array<std::array<bool, boardSizeY>, boardSizeX> CheckerBoard::getChanged(Ch
     {
         for (size_t y = 0; y < boardSizeY; y++)
         {
-            vector<Point> boardPointCV = vector<Point>();
+            vector<cv::Point> boardPointCV = vector<cv::Point>();
             auto points = getSquare(x, y);
-            boardPointCV.push_back(Point(points[0].first, points[0].second));
-            boardPointCV.push_back(Point(points[1].first, points[1].second));
-            boardPointCV.push_back(Point(points[2].first, points[2].second));
-            boardPointCV.push_back(Point(points[3].first, points[3].second));
+            boardPointCV.push_back(cv::Point(points[0].first, points[0].second));
+            boardPointCV.push_back(cv::Point(points[1].first, points[1].second));
+            boardPointCV.push_back(cv::Point(points[2].first, points[2].second));
+            boardPointCV.push_back(cv::Point(points[3].first, points[3].second));
             auto color = this->getTileColor(x, y);
-            auto scolor = Scalar(0, changed[x][y] ? 255 : 0, changed[x][y] ? 0 : 255);
-            auto ccolor = Scalar(color[0], color[1], color[2]);
-            vector<vector<Point>> boardPointCVs = { boardPointCV };
+            auto scolor = cv::Scalar(0, changed[x][y] ? 255 : 0, changed[x][y] ? 0 : 255);
+            auto ccolor = cv::Scalar(color[0], color[1], color[2]);
+            vector<vector<cv::Point>> boardPointCVs = { boardPointCV };
             fillPoly(overlay, boardPointCVs, scolor);
-            drawContours(overlay, boardPointCVs, -1, Scalar(255, 255, 255), 2, LINE_AA);
+            drawContours(overlay, boardPointCVs, -1, cv::Scalar(255, 255, 255), 2, cv::LINE_AA);
         }
     }
     
-    imwrite("overlay.jpg", overlay);
+    cv::imwrite("overlay.jpg", overlay);
     //waitKey(100);
 
     return changed;
