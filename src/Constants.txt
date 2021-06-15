@@ -1,0 +1,7 @@
+DominationMultiplier=60f
+DominationMinimum=50
+ImageSize=500
+port=8080
+Verifies=3
+CameraInput=0
+TileDif=20
